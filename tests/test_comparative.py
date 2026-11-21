@@ -2,14 +2,18 @@ import json
 from math import pi
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Thread
 import unittest
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from analysis_core import Sample, process_samples
-from app import export_files, json_bytes
+from app import create_server, export_files, json_bytes
 from comparative import build_comparative, cycling_analysis, grade_percent, running_comparison, strongest_climb
 from environmental import EARTH_RADIUS_M, Observations, Sources, geographic_distance, heading_deg, wind_components
 from geography import match_route, route_parts
 from synthetic_data import build_dataset
+from test_private_preview import activity_fit
 
 
 def route(name, points, *, speed=4, times=None, heart=140, breaks=(), elevations=None):
@@ -207,7 +211,8 @@ class EnvironmentalTests(unittest.TestCase):
 
 
 class ComparativeIntegrationTests(unittest.TestCase):
-    def test_public_fixture_is_reproducible(self):
+
+    def test_public_fixture_reproducible_and_private_endpoint_has_no_export(self):
         dataset = build_dataset()
         first = build_comparative(dataset["activities"], synthetic=True)
         self.assertEqual(json_bytes(first), json_bytes(build_comparative(dataset["activities"], synthetic=True)))
@@ -216,3 +221,26 @@ class ComparativeIntegrationTests(unittest.TestCase):
         self.assertEqual(first["provenance"]["weather"]["source_kind"], "synthetic")
         self.assertEqual(first["cycling"]["environment"]["headwind_mps_coverage"], 1)
         self.assertNotIn("comparative", json.loads(export_files(dataset)["ridge-traverse.json"]))
+
+        private = {"metadata": {"dataset_type": "private-fit-preview"}, "activities": []}
+        marker = {"synthetic": False, "test": "only served from loopback"}
+        with create_server(0, private, marker) as server:
+            thread = Thread(target=server.serve_forever)
+            thread.start()
+            url = f"http://127.0.0.1:{server.server_port}"
+            try:
+                with urlopen(url + "/api/comparative", timeout=5) as response:
+                    self.assertEqual(json.load(response), marker)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                for request, status in (
+                    (Request(url + "/api/comparative", headers={"Host": "remote.example"}), 403),
+                    (url + "/exports/ridge-traverse.json", 404),
+                    (url + "/private-data/review/observations.json", 404),
+                ):
+                    with self.assertRaises(HTTPError) as error:
+                        urlopen(request, timeout=5)
+                    self.assertEqual(error.exception.code, status)
+                    error.exception.close()
+            finally:
+                server.shutdown()
+                thread.join()

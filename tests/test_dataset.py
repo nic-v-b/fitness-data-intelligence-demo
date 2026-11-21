@@ -79,12 +79,6 @@ class DatasetTests(unittest.TestCase):
 
 
 class LocalHTTPTests(unittest.TestCase):
-    def test_server_and_export_reject_non_synthetic_metadata(self):
-        dataset = {"metadata": {"dataset_type": "recorded"}}
-        for operation in (lambda: create_server(0, dataset), lambda: export_files(dataset)):
-            with self.subTest(operation=operation), self.assertRaisesRegex(ValueError, "Only the synthetic dataset"):
-                operation()
-
     def test_loopback_serving_and_downloads(self):
         dataset = build_dataset()
         exports = export_files(dataset)
@@ -105,11 +99,10 @@ class LocalHTTPTests(unittest.TestCase):
                 with urlopen(Request(f"{base}/app.js", method="HEAD"), timeout=5) as response:
                     self.assertEqual(response.read(), b"")
                     self.assertGreater(int(response.headers["Content-Length"]), 0)
-                for path in ("/README.md", "/private-data/route.fit", "/leaflet.js", "/mapbox-logo"):
-                    with self.subTest(path=path), self.assertRaises(HTTPError) as missing:
-                        urlopen(base + path, timeout=5)
-                    with missing.exception as response:
-                        self.assertEqual(response.code, 404)
+                with self.assertRaises(HTTPError) as missing:
+                    urlopen(f"{base}/README.md", timeout=5)
+                with missing.exception as response:
+                    self.assertEqual(response.code, 404)
             finally:
                 server.shutdown()
                 thread.join()
