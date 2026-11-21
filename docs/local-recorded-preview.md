@@ -55,7 +55,7 @@ visible area and zoom to Mapbox.
   appropriately restricted token and monitor usage. Never commit it.
 - The public repository must continue to use independently invented data
   for interactive routes. The recorded Garmin examples published in README
-  are privacy-trimmed, flattened media, not interactive GPX/FIT data.
+  are selected, static images and animations, not interactive GPX/FIT data.
 - The local athlete Profile and Planner still use **fictional** longitudinal
   examples. Private FIT ingestion does not turn their illustrative readiness
   or planning rules into individualized clinical advice.
@@ -65,7 +65,7 @@ visible area and zoom to Mapbox.
 
 ## Protected three-run review plus the complete cycling ride
 
-The original owner-reviewed 500 m experimental bundle is kept separate from
+The previously validated protected running-route review is kept separate from
 the complete original cycling recording. The complete cycling FIT is admitted
 only if its GPS trace agrees with the ride already present in the protected
 bundle at several locations along the route.
@@ -92,12 +92,13 @@ python tools/run_local_recorded_preview.py `
 totals, plus one **complete cycling FIT**. This is a private loopback session;
 it must not be exposed via a reverse proxy, tunnel or deployed application.
 
-The 500 m radius is an **experimental owner-selected radius** in the supplied
-`route_privacy.py`: the algorithm additionally excludes a 200 m safety margin,
-checks for crossing edges, and removes 300–650 m at interior cuts. These are
-geometric safeguards, not a demonstration of anonymity. Geographic imagery
-can still disclose recognizable surroundings. Approval to show the complete
-cycling route does not authorize publication of raw FIT files or token files.
+The route-protection implementation in `route_privacy.py` excludes areas around
+recording endpoints, checks that retained segments do not reconnect across
+excluded areas, and preserves gaps in the visualizations. Its exact geometric
+criteria and limitations are documented in the source and regression tests.
+These safeguards reduce location disclosure but cannot establish anonymity:
+familiar terrain may still be recognizable. The complete cycling route is used
+only in the private local review; never commit raw FIT data or Mapbox tokens.
 
 To use independently verified **activity-level historical weather** for the
 complete cycling ride only, first copy the previously staged private weather
