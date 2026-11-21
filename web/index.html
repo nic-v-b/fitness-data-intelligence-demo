@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f0f4f7">
+  <title>Fitness Data Intelligence</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+  <script src="/comparative.js" defer></script>
+  <script src="/route-map.js" defer></script>
+  <script src="/athlete.js" defer></script>
+  <script src="/portfolio.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="shell topbar">
+      <div class="brand"><img src="/favicon.svg" alt="" width="30" height="30"> Fitness Data Intelligence</div>
+      <nav class="view-navigation" aria-label="Application pages">
+        <button data-view="history" type="button" aria-pressed="true">Activity History</button>
+        <button data-view="explorer" type="button" aria-pressed="false">Activity Explorer</button>
+        <button data-view="profile" type="button" aria-pressed="false">Fitness Profile</button>
+        <button data-view="planner" type="button" aria-pressed="false">Training Planner</button>
+      </nav>
+      <span class="demo-badge">Fictional data</span>
+    </div>
+  </header>
+
+  <main class="shell" id="main-content" tabindex="-1">
+    <p class="feedback" id="load-status" role="status">Loading the local dataset…</p>
+    <div id="history-workspace" hidden></div>
+    <div id="profile-workspace" hidden></div>
+    <div id="planner-workspace" hidden></div>
+    <div id="workspace" hidden>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="section-label" id="explorer-section">Activity Explorer</p>
+          <h1 id="page-title">Activity Explorer</h1>
+          <p id="dataset-intro"></p>
+        </div>
+        <div class="explorer-tools">
+          <div class="run-control">
+            <label for="activities">Select activity</label>
+            <select id="activities"></select>
+          </div>
+          <div class="explorer-actions">
+            <button class="provenance-button" id="provenance-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8v.1"/></svg>
+              Data provenance
+            </button>
+            <a class="export-button" id="json-export" href="/exports/ridge-traverse.json" download hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>
+              <span>Export JSON</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Activity summary">
+        <div class="stat"><span id="stat-distance-label">Distance</span><div id="stat-distance">—</div></div>
+        <div class="stat"><span id="stat-time-label">Elapsed time</span><div id="stat-time">—</div></div>
+        <div class="stat"><span id="stat-pace-label">Average pace</span><div id="stat-pace">—</div></div>
+        <div class="stat"><span>Mean heart rate</span><div id="stat-heart">—</div></div>
+        <div class="stat"><span id="stat-gain-label">Elevation gain</span><div id="stat-gain">—</div></div>
+      </section>
+
+      <div class="analysis-grid route-analysis">
+        <section class="panel route-panel" aria-labelledby="route-title">
+          <div class="panel-heading route-heading">
+            <div><h2 id="route-title">Route trace</h2><p>Fictional coordinates · local metres</p></div>
+            <div class="segmented small" id="route-metric" role="group" aria-label="Colour route by sensor">
+              <button type="button" data-metric="speed" aria-pressed="true">Speed</button>
+              <button type="button" data-metric="heart" aria-pressed="false">Heart rate</button>
+            </div>
+          </div>
+          <div class="route-map activity-map">
+            <svg id="route" viewBox="0 0 640 380" role="img" aria-labelledby="map-name map-description">
+              <title id="map-name">Fictional running route</title>
+              <desc id="map-description">Click a route point or use the selected sample slider to inspect speed, heart rate and elevation at the same position.</desc>
+              <defs>
+                <pattern id="grid-lines" width="26" height="26" patternUnits="userSpaceOnUse">
+                  <path d="M26 0H0V26" fill="none" class="map-grid-minor"/>
+                </pattern>
+                <pattern id="major-lines" width="104" height="104" patternUnits="userSpaceOnUse">
+                  <rect width="104" height="104" fill="url(#grid-lines)"/>
+                  <path d="M104 0H0V104" fill="none" class="map-grid-major"/>
+                </pattern>
+              </defs>
+              <rect width="640" height="380" fill="url(#major-lines)"/>
+              <g class="map-compass" aria-hidden="true" transform="translate(600 48)">
+                <text y="-13" text-anchor="middle">N</text>
+                <path d="M0-7 6 10 0 6-6 10Z"/>
+              </g>
+              <g id="map-features"></g>
+              <g id="map-cursor" aria-hidden="true">
+                <circle class="map-cursor-halo" r="12"/>
+                <circle class="map-cursor-dot" r="6"/>
+              </g>
+            </svg>
+          </div>
+          <div class="map-legend">
+            <div class="scale-legend"><span id="legend-min"></span><span id="legend-ramp" class="legend-ramp" aria-hidden="true"></span><span id="legend-max"></span></div>
+            <div id="shared-legend"><i class="legend-shared" aria-hidden="true"></i> Shared section</div>
+            <div><i class="legend-gap" aria-hidden="true"></i> Unavailable</div>
+            <div id="overlay-legend" hidden><i class="legend-overlay" aria-hidden="true"></i> Historical overlay</div>
+          </div>
+          <div id="map-controls" class="map-controls"></div>
+        </section>
+
+        <section class="panel signals-panel" aria-labelledby="signal-title">
+          <div class="panel-heading signal-heading">
+            <div><h2 id="signal-title">Sensor timeline</h2><p>All three traces share the same elapsed time.</p></div>
+            <span class="sample-count" id="sample-count"></span>
+          </div>
+          <div class="plots" id="plots"></div>
+        </section>
+      </div>
+      <div class="timeline sample-timeline">
+        <div class="timeline-label">
+          <label for="sample-index">Selected sample</label>
+          <output id="sample-position" for="sample-index" aria-live="off"></output>
+        </div>
+        <input id="sample-index" type="range" min="0" value="0" step="1">
+      </div>
+
+      <div id="activity-takeaway"></div>
+      <div id="explorer-context"></div>
+      <div id="comparative-workspace" hidden></div>
+
+      <details class="explorer-details">
+        <summary>Distance splits and signal quality</summary>
+        <div class="analysis-grid details-grid">
+        <section class="panel" aria-labelledby="splits-title">
+          <div class="panel-heading"><div><h2 id="splits-title">Distance splits</h2><p>1 km intervals with a partial final split where applicable.</p></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Split</th><th scope="col">Distance</th><th scope="col">Time (min:s)</th><th scope="col">Pace</th></tr></thead>
+              <tbody id="splits"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="quality-title">
+          <div class="panel-heading"><div><h2 id="quality-title">Data quality</h2><p>Missing and rejected readings appear as gaps in the timeline.</p></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th scope="col">Signal</th><th scope="col">Valid</th><th scope="col">Missing</th><th scope="col">Invalid</th></tr></thead>
+              <tbody id="quality"></tbody>
+            </table>
+          </div>
+          <div class="quality-footer">
+            <span id="heart-coverage"></span>
+            <a id="csv-export" href="/exports/west-run.csv" download hidden>Download activity CSV <span aria-hidden="true">↓</span></a>
+          </div>
+        </section>
+        </div>
+      </details>
+    </div>
+  </main>
+
+  <footer class="shell site-footer"><span>Fitness Data Intelligence</span><span id="dataset-version"></span></footer>
+
+  <dialog id="provenance-dialog" aria-labelledby="provenance-title">
+    <form method="dialog">
+      <div class="dialog-heading"><h2 id="provenance-title">Data provenance</h2><button type="submit" aria-label="Close provenance">×</button></div>
+    </form>
+    <p id="provenance-origin">Both activities are generated from fixed seeds on a fictional Cartesian route. The Ridge traverse is shared by design.</p>
+    <dl id="provenance-fields"></dl>
+    <p id="provenance-notes">Exports include generation settings, units, calculation assumptions and per-sample quality flags.</p>
+  </dialog>
+</body>
+</html>

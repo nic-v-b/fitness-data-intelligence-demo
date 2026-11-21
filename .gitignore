@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+artifacts/
+/docs/media/review/
+/private-data/
+*.fit
+*.gpx
+*.tcx
+.env
+.env.*
+node_modules/
