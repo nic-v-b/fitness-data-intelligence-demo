@@ -24,7 +24,7 @@
         <button data-view="profile" type="button" aria-pressed="false">Fitness Profile</button>
         <button data-view="planner" type="button" aria-pressed="false">Training Planner</button>
       </nav>
-      <span class="demo-badge">Fictional data</span>
+      <span class="demo-badge" id="dataset-label">Synthetic dataset</span>
     </div>
   </header>
 
@@ -69,13 +69,14 @@
       <div class="analysis-grid route-analysis">
         <section class="panel route-panel" aria-labelledby="route-title">
           <div class="panel-heading route-heading">
-            <div><h2 id="route-title">Route trace</h2><p>Fictional coordinates · local metres</p></div>
+            <div><h2 id="route-title">Route trace</h2><p id="route-subtitle">Fictional coordinates · local metres</p></div>
             <div class="segmented small" id="route-metric" role="group" aria-label="Colour route by sensor">
               <button type="button" data-metric="speed" aria-pressed="true">Speed</button>
               <button type="button" data-metric="heart" aria-pressed="false">Heart rate</button>
             </div>
           </div>
           <div class="route-map activity-map">
+            <div id="leaflet-route" hidden aria-label="Geographic route map"></div>
             <svg id="route" viewBox="0 0 640 380" role="img" aria-labelledby="map-name map-description">
               <title id="map-name">Fictional running route</title>
               <desc id="map-description">Click a route point or use the selected sample slider to inspect speed, heart rate and elevation at the same position.</desc>
@@ -153,6 +154,10 @@
             <span id="heart-coverage"></span>
             <a id="csv-export" href="/exports/west-run.csv" download hidden>Download activity CSV <span aria-hidden="true">↓</span></a>
           </div>
+          <details id="fit-checks" class="fit-checks" hidden>
+            <summary>FIT validation</summary>
+            <dl id="fit-check-fields"></dl>
+          </details>
         </section>
         </div>
       </details>

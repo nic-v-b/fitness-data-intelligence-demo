@@ -357,3 +357,18 @@ dialog dd { margin: 0; font-variant-numeric: tabular-nums; }
   .comparison-reading { gap: 2px 6px; font-size: 11px; }
   .compare-support table { font-size: 12px; }
 }
+
+
+/* Retained recorded GPS/Leaflet satellite mode, one map with an offline SVG fallback. */
+.satellite-privacy { flex-basis: 100%; }
+.activity-map { position: relative; isolation: isolate; min-height: clamp(275px, 28vw, 420px); }
+#leaflet-route { position: absolute; inset: 0; z-index: 1; background: #18374c; }
+#leaflet-route[hidden], #route[hidden] { display: none !important; }
+#leaflet-route[data-loading] { visibility: hidden; }
+#leaflet-route .leaflet-container, #leaflet-route .leaflet-control { color: #132b42; }
+.mapbox-mark { position: absolute; left: 9px; bottom: 7px; z-index: 700; display: block; }
+.mapbox-mark img { display: block; max-width: 91px; max-height: 24px; }
+.fit-checks { border-top: 1px solid var(--separator); padding: 10px 17px 13px; color: var(--muted); font-size: 12px; }
+.fit-checks summary { width: fit-content; color: var(--accent); cursor: pointer; font-weight: 650; }
+.fit-checks dl { display: grid; grid-template-columns: 1fr auto; gap: 5px 12px; margin: 8px 0 0; }
+.fit-checks dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
