@@ -1,4 +1,4 @@
-"""Serve the local synthetic activity explorer or export its demonstration data."""
+"""Serve the local activity explorer or export its synthetic demonstration data."""
 
 import argparse
 import csv
@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
 from analysis_core import AXES, SIGNALS
@@ -16,6 +17,7 @@ from synthetic_data import build_dataset
 
 
 STATIC = Path(__file__).resolve().parent / "web"
+LEAFLET = STATIC.parent / "node_modules" / "leaflet" / "dist"
 STATIC_ROUTES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
@@ -24,6 +26,7 @@ STATIC_ROUTES = {
     "/portfolio.js": ("portfolio.js", "text/javascript; charset=utf-8"),
     "/route-map.js": ("route-map.js", "text/javascript; charset=utf-8"),
     "/athlete.js": ("athlete.js", "text/javascript; charset=utf-8"),
+    "/favicon.png": ("favicon.png", "image/png"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 
@@ -61,26 +64,61 @@ def export_files(dataset):
             **{f"{run['id']}.csv": sample_csv(dataset["metadata"], run) for run in dataset["activities"]}}
 
 
-def create_server(port, dataset):
-    if dataset["metadata"]["dataset_type"] != "synthetic":
-        raise ValueError("Only the synthetic dataset can be served")
+def mapbox_options(token_path, logo_path):
+    from private_preview import PRIVATE_ROOT
 
+    if not token_path and not logo_path:
+        return None
+    if not token_path or not logo_path:
+        raise ValueError("Mapbox requires a public token file and the official attribution logo")
+    token_path, logo_path = token_path.resolve(), logo_path.resolve()
+    if (not token_path.is_relative_to(PRIVATE_ROOT) or not logo_path.is_relative_to(PRIVATE_ROOT)
+            or logo_path.suffix.lower() not in (".svg", ".png")):
+        raise ValueError("Use an ignored private-data token file and an official Mapbox SVG or PNG logo")
+    try:
+        token = token_path.read_text(encoding="utf-8-sig").strip()
+        logo = logo_path.read_bytes()
+    except OSError:
+        raise ValueError("Could not read the local Mapbox attribution assets") from None
+    if not re.fullmatch(r"pk\.[A-Za-z0-9._-]+", token) or not logo:
+        raise ValueError("Mapbox expects a public pk. token and a nonempty attribution logo")
+    return token, logo, {".svg": "image/svg+xml", ".png": "image/png"}[logo_path.suffix.lower()]
+
+
+def create_server(port, dataset, comparative=None, *, portfolio=None, mapbox=None):
+    dataset_type = dataset["metadata"]["dataset_type"]
+    synthetic = dataset_type == "synthetic"
     responses = {path: ((STATIC / name).read_bytes(), media_type, None)
                  for path, (name, media_type) in STATIC_ROUTES.items()}
-    json_type = "application/json; charset=utf-8"
-    comparative = build_comparative(dataset["activities"], synthetic=True)
-    portfolio = public_portfolio(dataset)
-    responses["/api/dataset"] = (json_bytes(dataset), json_type, None)
-    responses["/api/comparative"] = (json_bytes(comparative), json_type, None)
-    responses["/api/portfolio"] = (json_bytes({**portfolio.index(), "map": {"leaflet": False, "satellite": None}}),
-                                   json_type, None)
-    responses["/api/athlete"] = (json_bytes(athlete_demo()), json_type, None)
-    responses["/api/athlete/compressed"] = (json_bytes(athlete_demo("compressed")), json_type, None)
-    for filename, content in export_files(dataset).items():
-        media_type = "text/csv" if filename.endswith(".csv") else "application/json"
-        responses[f"/exports/{filename}"] = (content, f"{media_type}; charset=utf-8", filename)
+    responses["/api/dataset"] = (json_bytes(dataset), "application/json; charset=utf-8", None)
+    if synthetic:
+        comparative = build_comparative(dataset["activities"], synthetic=True)
+        portfolio = public_portfolio(dataset)
+        mapbox = None
+        for filename, content in export_files(dataset).items():
+            media_type = "text/csv" if filename.endswith(".csv") else "application/json"
+            responses[f"/exports/{filename}"] = (content, f"{media_type}; charset=utf-8", filename)
+    if comparative is not None:
+        responses["/api/comparative"] = (json_bytes(comparative), "application/json; charset=utf-8", None)
+    leaflet = not synthetic and all((LEAFLET / path).is_file() for path in ("leaflet.js", "leaflet.css"))
+    if leaflet:
+        responses["/leaflet.js"] = ((LEAFLET / "leaflet.js").read_bytes(), "text/javascript; charset=utf-8", None)
+        responses["/leaflet.css"] = ((LEAFLET / "leaflet.css").read_bytes(), "text/css; charset=utf-8", None)
+    tile_access = bool(leaflet and mapbox)
+    if tile_access:
+        responses["/mapbox-logo"] = (mapbox[1], mapbox[2], None)
+    if portfolio is not None:
+        options = {"leaflet": bool(leaflet), "satellite": mapbox[0] if tile_access else None}
+        responses["/api/portfolio"] = (json_bytes({**portfolio.index(), "map": options}),
+                                       "application/json; charset=utf-8", None)
+        responses["/api/athlete"] = (json_bytes(athlete_demo()), "application/json; charset=utf-8", None)
+        responses["/api/athlete/compressed"] = (json_bytes(athlete_demo("compressed")), "application/json; charset=utf-8", None)
 
     class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            if synthetic:
+                super().log_message(format, *args)
+
         def do_GET(self):
             self.respond(include_body=True)
 
@@ -88,9 +126,13 @@ def create_server(port, dataset):
             self.respond(include_body=False)
 
         def respond(self, include_body):
+            if not synthetic and (self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}"
+                            or self.headers.get("Sec-Fetch-Site") == "cross-site"):
+                self.send_error(403)
+                return
             path = urlsplit(self.path).path
             response = responses.get(path)
-            if response is None and path.startswith("/api/activities/"):
+            if response is None and portfolio is not None and path.startswith("/api/activities/"):
                 key = path.removeprefix("/api/activities/")
                 if key in portfolio.activities:
                     response = json_bytes(portfolio.detail(key)), "application/json; charset=utf-8", None
@@ -108,6 +150,8 @@ def create_server(port, dataset):
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             csp = "default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+            if tile_access:
+                csp += "; img-src 'self' data: https://api.mapbox.com"
             self.send_header("Content-Security-Policy", csp)
             self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.send_header("Referrer-Policy", "no-referrer")

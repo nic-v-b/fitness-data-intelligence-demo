@@ -1,12 +1,14 @@
+# Local and generated artifacts — never publish real Garmin data
 __pycache__/
 *.py[cod]
 .venv/
+.env/
+node_modules/
 artifacts/
+private-data/
 /docs/media/review/
-/private-data/
-*.fit
+*.[Ff][Ii][Tt]
 *.gpx
 *.tcx
 .env
 .env.*
-node_modules/
