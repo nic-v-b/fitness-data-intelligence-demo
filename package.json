@@ -1,0 +1,7 @@
+{
+  "name": "fitness-data-intelligence-map",
+  "private": true,
+  "dependencies": {
+    "leaflet": "1.9.4"
+  }
+}

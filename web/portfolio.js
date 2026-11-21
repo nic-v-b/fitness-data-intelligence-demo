@@ -82,10 +82,16 @@ function renderHistory() {
   const runs = rows.filter((r) => r.sport === "running");
   const rides = rows.length - runs.length;
   const comparable = runs.filter((r) => r.distance_m >= 5500 && r.distance_m <= 6500).length;
-  const intro = pageTitle("Activity History", "Browse fictional routes, compare running efforts and inspect ride conditions.");
+  const mixedReview = recordedReview && agenda.metadata.cycling_full_route === true;
+  const intro = pageTitle("Activity History", recordedReview
+    ? mixedReview ? "Running metrics describe protected route sections; the cycling ride is complete. Dates are withheld."
+      : "Metrics describe retained route sections. Full-activity totals and dates are withheld."
+    : "Browse recorded routes, compare running efforts and inspect ride conditions.",
+    mixedReview ? "Private recorded review" : recordedReview ? "Recorded route privacy review"
+      : privatePreview ? "Private local review" : "Fictional demonstration");
   const stats = html("div", "history-overview");
   for (const [label, figure] of [["Activities", rows.length],
-    ["Runs near 6 km", comparable], ["Cycling rides", rides]]) {
+    recordedReview ? ["Recorded runs", runs.length] : ["Runs near 6 km", comparable], ["Cycling rides", rides]]) {
     const card = html("div", "history-stat");
     card.append(html("span", null, label), html("strong", null, figure));
     stats.append(card);
@@ -103,14 +109,11 @@ function renderHistory() {
   }
   tableCard.querySelector(".panel-heading").append(filters);
   const columns = [
-    ["date", "Activity / date"], ["sport", "Sport"],
-    ["distance_m", "Distance"],
+    [recordedReview ? "name" : "date", recordedReview ? "Activity" : "Activity / date"], ["sport", "Sport"],
+    ["distance_m", recordedReview && !mixedReview ? "Visible distance" : "Distance"],
     ["speed_kmh", "Pace / speed"], ["duration_s", "Timer time"], ["heart_bpm", "Heart rate"], ["ascent_m", "Ascent"],
   ];
   const wrap = html("div", "history-table-wrap");
-  wrap.tabIndex = 0;
-  wrap.setAttribute("role", "region");
-  wrap.setAttribute("aria-label", "Activities table");
   const table = html("table", "history-table");
   const head = html("thead");
   const labels = html("tr");
@@ -154,6 +157,10 @@ function renderHistory() {
   table.append(head, body);
   wrap.append(table);
   tableCard.append(wrap);
+  if (privatePreview && agenda.cohort) {
+    const { accepted, candidates } = agenda.cohort;
+    tableCard.append(html("p", "comparison-copy", `${accepted} of ${candidates} staged candidates passed the cohort checks.`));
+  }
   holder.replaceChildren(intro, stats, tableCard);
 }
 
@@ -193,7 +200,7 @@ function weatherEvidence(detail) {
 
 function peerEvidence(detail) {
   const { similar, same_route: sameRoute, profile } = detail.peer_context;
-  const card = comparisonCard("Running performance context",
+  const card = comparisonCard(recordedReview ? "Visible-section context" : "Running performance context",
     "The selected run is excluded from both historical references.");
   const labels = html("div", "semantic-strip peer-classifications");
   labels.append(semanticLabel(detail.semantic.similar_pace, "Similar distance · "),
@@ -206,9 +213,11 @@ function peerEvidence(detail) {
     ["Same-route subset", sameRoute.count, pace(sameRoute.median), band(sameRoute), percent(sameRoute)],
   ]));
   if (similar.percentile != null) card.append(html("p", "comparison-copy", "¹ Ties count half. The rank is shown from five peers."));
-  const methods = html("details", "evidence-details");
+  const methods = html("details", "fit-checks");
   methods.append(html("summary", null, "Comparison methods"), html("p", null,
-    "Similar runs use the 5.5–6.5 km band for a 6 km selection and ±500 m for other selected runs. Same-route peers need at least 3 km of continuous same-direction overlap and 60% of the shorter route. Shared-ground chart bins use timer-active seconds over the selected route distance."));
+    recordedReview
+      ? "Similar distances are compared within 500 m of the selected section length. Same-route peers need continuous same-direction overlap of at least 1 km and 60% of the shorter visible route. Pace uses retained timer-active intervals."
+      : "Similar runs use the 5.5–6.5 km band for a 6 km selection and ±500 m for other selected runs. Same-route peers need at least 3 km of continuous same-direction overlap and 60% of the shorter GPS route. Whole-activity pace uses FIT timer time. Shared-ground chart bins use timer-active seconds over the selected route distance."));
   card.append(methods);
   return { card, profile };
 }
@@ -236,8 +245,7 @@ function sameRouteChart(profile) {
     plot.update(index);
   }
   const plot = comparisonChart({ title: "Pace · min/km", series: [
-    { color: "var(--speed)", get: (bin) => bin.selected },
-    { color: "var(--elevation)", dash: "4 3", get: (bin) => bin.median },
+    { color: "#237cc0", get: (bin) => bin.selected }, { color: "#087b67", get: (bin) => bin.median },
   ], axis: clock, format: pace, minStep: 10, band: (bin) => bin.band }, bins, distance,
   (m) => distanceIndex(bins, m), select, card);
   graph.append(plot.container);
@@ -252,7 +260,7 @@ function sameRouteChart(profile) {
 }
 
 function renderRunComparison(detail, peers, evidence) {
-  const fixed = detail.pair && { ...detail.pair, synthetic: true };
+  const fixed = detail.pair && { ...detail.pair, synthetic: !privatePreview };
   function show(pair) {
     const runs = pair?.run_ids.map((id) => agenda.history.find((run) => run.id === id));
     showComparison(pair, "running", runs);
@@ -303,9 +311,10 @@ function renderRunComparison(detail, peers, evidence) {
 function renderExplorer(detail) {
   chooseActivity(detail.activity);
   const selected = detail.history;
-  byId("explorer-section").textContent = "Activity Explorer · " + sportText(selected.sport);
-  byId("page-title").textContent = selected.name;
-  byId("dataset-intro").textContent = dayText(selected.date) + " · Fictional activity";
+  byId("dataset-intro").textContent = `${selected.name} · ${sportText(selected.sport)} · ${recordedReview
+    ? (agenda.metadata.cycling_full_route && selected.sport === "cycling"
+      ? "Complete recorded cycling activity. Private local review." : "Visible sections only. Full-activity metrics withheld.")
+    : dayText(selected.date)}`;
   byId("activity-takeaway").replaceChildren(takeawayCard(detail.takeaway));
   peerObserver?.disconnect();
   const evidence = byId("explorer-context");
@@ -321,10 +330,10 @@ function renderExplorer(detail) {
     if (profile?.bins?.length) evidence.append(sameRouteChart(profile));
     renderRunComparison(detail, historyPeers, evidence);
   } else {
-    showComparison({ synthetic: true, cycling: detail.cycling, provenance: detail.provenance,
+    showComparison({ synthetic: !privatePreview && !recordedReview, cycling: detail.cycling, provenance: detail.provenance,
       methods: detail.methods }, "cycling");
   }
-  configureRouteOverlay(historyPeers, fetchDetail);
+  configureRouteMap(detail, agenda.map, historyPeers, fetchDetail);
 }
 
 async function renderPage() {
@@ -337,9 +346,10 @@ async function renderPage() {
   document.body.dataset.view = view;
   byId("dataset-version").textContent = view === "profile" || view === "planner"
     ? "Fictional training history · 36 weeks"
-    : "Fictional activity history · processing " + agenda.metadata.processing_version;
+    : `${recordedReview ? "Recorded route privacy review" : privatePreview
+      ? "Private FIT preview" : "Fictional activity history"} · processing ${agenda.metadata.processing_version}`;
   byId("load-status").hidden = true;
-  resetRouteOverlay();
+  stopGeographicMap();
   if (view === "history") { renderHistory(); return; }
   if (view === "profile" || view === "planner") {
     renderAthletePage(view, pagePanels[view], id);
@@ -364,10 +374,6 @@ async function renderPage() {
 }
 
 for (const button of pages) button.onclick = () => navigatePage(button.dataset.view);
-document.querySelector(".skip-link").addEventListener("click", (event) => {
-  event.preventDefault();
-  byId("main-content").focus();
-});
 controls.activities.onchange = () => navigatePage("explorer", controls.activities.value);
 window.addEventListener("hashchange", renderPage);
 fetch("/api/portfolio").then((response) => {
@@ -376,6 +382,7 @@ fetch("/api/portfolio").then((response) => {
 }).then((data) => {
   agenda = data;
   setupExplorer(data.metadata);
+  if (recordedReview) historySort = { key: "name", direction: 1 };
   const ordered = data.history.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   currentId = ordered[0].id;
   controls.activities.append(...ordered.map((entry) => new Option(activityLabel(entry), entry.id)));

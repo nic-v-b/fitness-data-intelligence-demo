@@ -20,6 +20,9 @@ let routeMetric = "speed";
 let project;
 let routePoints;
 let plots;
+let privatePreview = false;
+let recordedReview = false;
+let fullCyclingReview = false;
 let plotTicks;
 let historyOverlay;
 let rideTimelineUpdate = null;
@@ -75,32 +78,60 @@ function row(values) {
 function renderSummary() {
   const s = activity.summary;
   const cycling = activity.sport === "cycling";
+  const fullRide = recordedReview && fullCyclingReview && cycling;
+  if (recordedReview) {
+    byId("stat-distance-label").textContent = fullRide ? "Full distance" : "Visible distance";
+    byId("stat-time-label").textContent = fullRide ? "Elapsed time" : "Visible timer time";
+    byId("stat-gain-label").textContent = fullRide ? "Recorded ascent" : "Visible ascent";
+    byId("route-subtitle").textContent = fullRide ? "Full recorded cycling GPS · north-up" : "Retained GPS sections · north-up";
+  }
   setStat("stat-distance", number(s.distance_m === null ? null : s.distance_m / 1000, 2), "km");
   setStat("stat-time", clock(s.elapsed_s), "min:s");
-  byId("stat-pace-label").textContent = cycling ? "Elapsed avg. speed" : "Elapsed pace";
+  byId("stat-pace-label").textContent = recordedReview ? (fullRide ? "Average speed" : cycling ? "Visible avg. speed" : "Visible pace")
+    : cycling ? "Elapsed avg. speed" : "Elapsed pace";
   setStat("stat-pace", cycling ? number(s.mean_speed_kmh, 1) : clock(s.mean_pace_s_per_km), cycling ? "km/h" : "/km");
   setStat("stat-heart", number(s.mean_heart_rate_bpm), "bpm");
-  setStat("stat-gain", number(s.elevation_gain_m), "m");
+  setStat("stat-gain", number(privatePreview || fullRide ? (activity.diagnostics?.session_ascent_m ?? s.elevation_gain_m) : s.elevation_gain_m), "m");
   byId("sample-count").textContent = `${s.sample_count} samples`;
   byId("splits").replaceChildren(...activity.splits.map((split) => row([
     `${split.number}${split.complete ? "" : " · partial"}`,
     `${number(split.distance_m / 1000, 2)} km`, clock(split.duration_s),
     withUnit(clock(split.pace_s_per_km), "/km"),
   ])));
-  byId("quality").replaceChildren(...signals.map((signal) => {
+  const qualitySignals = privatePreview
+    ? [...signals, { key: "position", name: "GPS position" }, { key: "distance_m", name: "Distance" }]
+    : signals;
+  byId("quality").replaceChildren(...qualitySignals.map((signal) => {
     const counts = s.quality_counts[signal.key];
     return row([signal.name, counts.valid, counts.missing, counts.invalid]);
   }));
   byId("heart-coverage").textContent = s.heart_rate_coverage === null ? "Heart-rate coverage unavailable" :
     `Heart-rate time coverage ${number(s.heart_rate_coverage * 100, 1)}%`;
+  if (privatePreview) renderFitChecks(activity.diagnostics, s);
   const csv = byId("csv-export");
-  csv.hidden = !["west-run", "east-run"].includes(activity.id);
+  csv.hidden = privatePreview || recordedReview || !["west-run", "east-run"].includes(activity.id);
   if (!csv.hidden) csv.href = `/exports/${activity.id}.csv`;
 }
 
 function facts(target, settings) {
   byId(target).replaceChildren(...settings.flatMap(([label, value]) =>
     [html("dt", null, label), html("dd", null, value)]));
+}
+
+function renderFitChecks(checks, summary) {
+  const { session_distance_m: distance, last_sample_distance_m: lastDistance,
+    session_elapsed_s: elapsed, last_sample_elapsed_s: lastElapsed } = checks;
+  facts("fit-check-fields", [
+    ["Final sample − session distance", withUnit(number(distance === null || lastDistance === null ? null : lastDistance - distance, 2), "m")],
+    ["Final sample − session elapsed", withUnit(number(elapsed === null ? null : lastElapsed - elapsed, 3), "s")],
+    ["Recorded timer time", clock(checks.session_timer_s)],
+    ["Elapsed time origin", checks.elapsed_origin],
+    ["Long gaps / paused intervals", `${checks.long_gaps} / ${checks.pause_intervals}`],
+    ["GPS jumps flagged", checks.gps_jumps],
+    ["Missing / non-increasing timestamps", `${checks.missing_timestamps} / ${checks.non_increasing_timestamps}`],
+    ["Recorded mean heart rate", withUnit(number(checks.session_heart_rate_bpm), "bpm")],
+    ["Unfiltered positive elevation changes", withUnit(number(summary.elevation_gain_m, 1), "m")],
+  ]);
 }
 
 function routeProjection(activities) {
@@ -135,7 +166,7 @@ function signalTicks(activities, signal) {
 }
 
 function segmentColor(a, b, palette) {
-  if (a === null || b === null) return "var(--map-missing)";
+  if (a === null || b === null) return "#7c8997";
   const scaled = Math.max(0, Math.min(1, ((a + b) / 2 - palette.min) / (palette.max - palette.min))) * 2;
   const stop = Math.min(1, Math.floor(scaled));
   const rgb = palette.colors[stop].map((channel, index) =>
@@ -154,7 +185,7 @@ function routePalette() {
 
 function renderRoute() {
   const { signal, palette } = routePalette();
-  const width = 5;
+  const width = privatePreview ? 3.5 : 5;
   const layer = document.createDocumentFragment();
   const connected = routePoints.map((point, i) =>
     Boolean(point && routePoints[i - 1] && !activity.samples[i].route_break_before));
@@ -189,28 +220,27 @@ function renderRoute() {
   }
   routePoints.forEach((point, i) => {
     if (point && !connected[i] && !connected[i + 1]) {
-      layer.append(svg("circle", { cx: point[0], cy: point[1], r: 2, fill: "var(--map-missing)" }));
+      layer.append(svg("circle", { cx: point[0], cy: point[1], r: 2, fill: "#a7b8c5" }));
     }
   });
-  const first = routePoints.find(Boolean), last = routePoints.findLast(Boolean);
-  if (first && last) {
+  if (!recordedReview) {
+    const first = routePoints.find(Boolean), last = routePoints.findLast(Boolean);
     const near = Math.hypot(first[0] - last[0], first[1] - last[1]) < 55;
     for (const [[x, y], text, dy] of [[first, "START", near ? -12 : 20], [last, "FINISH", 20]]) {
       layer.append(
-        svg("circle", { cx: x, cy: y, r: 4.5, fill: "var(--map-mark)", stroke: "var(--paper)", "stroke-width": 2 }),
+        svg("circle", { cx: x, cy: y, r: 4.5, fill: "#19384f", stroke: "#dcebf5", "stroke-width": 2 }),
         svg("text", { x, y: y + dy, class: "map-tag", "text-anchor": "middle" }, text),
       );
     }
   }
-  const scaleMetres = 500;
+  const scaleMetres = privatePreview || recordedReview ? gridStep(75 / project.scale) : 500;
   const scale = project.scale * scaleMetres;
   layer.append(
-    svg("path", { d: `M26 340v5h${scale}v-5`, fill: "none", stroke: "var(--map-mark)", "stroke-width": 1.2 }),
+    svg("path", { d: `M26 340v5h${scale}v-5`, fill: "none", stroke: "#dcebf5", "stroke-width": 1.2 }),
     svg("text", { x: 26 + scale / 2, y: 362, "text-anchor": "middle" },
       scaleMetres >= 1000 ? `${scaleMetres / 1000} km` : `${scaleMetres} m`),
   );
   controls.features.replaceChildren(layer);
-  byId("overlay-legend").hidden = !historyOverlay;
   byId("map-name").textContent = `${activity.name} route coloured by ${signal.name.toLowerCase()}`;
   byId("legend-min").textContent = `${palette.min}`;
   byId("legend-max").textContent = `${palette.max} ${signal.unit}`;
@@ -292,15 +322,16 @@ function drawPlot(plot) {
       svg("text", { x: left - 6, y: y + 3, "text-anchor": "end" }, tick),
     );
   }
-  const tickSpacing = width < 360 ? 600 : 360;
+  const tickSpacing = recordedReview ? gridStep(Math.max(1, duration / (width < 360 ? 4 : 6)))
+    : (width < 360 || (privatePreview && duration > 2400)) ? 600 : 360;
   for (let time = 0; time <= duration; time += tickSpacing) {
     const x = xAt(time);
     graph.append(svg("line", { x1: x, y1: top, x2: x, y2: bottom, class: "gridline" }));
     if (showTime) graph.append(svg("text", { x, y: bottom + 14, "text-anchor": "middle" }, clock(time)));
   }
   if (showTime) {
-    graph.append(svg("text", { x: right, y: height - 1, "text-anchor": "end" },
-      "Elapsed time · min:s"));
+  graph.append(svg("text", { x: right, y: height - 1, "text-anchor": "end" },
+    recordedReview && !(fullCyclingReview && activity.sport === "cycling") ? "Visible time · min:s" : "Elapsed time · min:s"));
   }
 
   let segment = [];
@@ -337,9 +368,10 @@ function selectSample(index, syncRide = true) {
   if (point) controls.marker.setAttribute("transform", `translate(${point.join(" ")})`);
   controls.marker.dataset.sampleIndex = index;
   controls.slider.value = index;
+  if (typeof geographicMarker === "function") geographicMarker(index);
   if (syncRide) rideTimelineUpdate?.(elapsed);
   const distanceKm = number(distance === null ? null : distance / 1000, 2);
-  controls.position.value = `#${String(index + 1).padStart(3, "0")} · ${clock(elapsed)} · ${withUnit(distanceKm, "km")}${point ? "" : " · Position unavailable"}`;
+  controls.position.value = `#${String(index + 1).padStart(3, "0")} · ${clock(elapsed)} · ${withUnit(distanceKm, "km")}${point ? "" : " · GPS unavailable"}`;
   for (const plot of plots) {
     const value = valueOf(sample, plot.signal);
     const cursorX = plot.xAt(elapsed);
@@ -363,7 +395,7 @@ function selectSample(index, syncRide = true) {
   }
   const readings = plots.map(({ signal, reading }) => `${signal.name} ${reading.textContent}`).join(", ");
   controls.slider.setAttribute("aria-valuetext",
-    `Sample ${index + 1}, ${clock(elapsed)} elapsed, ${distance === null ? "distance unavailable" : `${distanceKm} kilometres`}, ${readings}${point ? "" : ", route position unavailable"}`);
+    `Sample ${index + 1}, ${clock(elapsed)} elapsed, ${distance === null ? "distance unavailable" : `${distanceKm} kilometres`}, ${readings}${point ? "" : ", GPS unavailable"}`);
 }
 
 function chooseActivity(run) {
@@ -383,7 +415,10 @@ function chooseActivity(run) {
 }
 
 function provenance(metadata) {
-  const origin = [
+  const origin = recordedReview ? [["Dataset", "Recorded route privacy review"], ["Source", "Retained Garmin observations"]]
+    : privatePreview ? [
+    ["Dataset", "Private local FIT preview"], ["Source", "Selected Garmin FIT recordings"],
+  ] : [
     ["Dataset", metadata.dataset_id], ["Source", "Deterministic synthetic generator"],
     ["Seeds", metadata.generation.runs.map((run) => run.seed).join(" · ")],
   ];
@@ -392,17 +427,45 @@ function provenance(metadata) {
     ["Coordinate system", metadata.coordinate_system], ["Schema", metadata.schema_version],
     ["Processing", metadata.processing_version],
   ]);
-  byId("dataset-version").textContent = metadata.dataset_id + " · processing " + metadata.processing_version;
+  byId("dataset-version").textContent = `${recordedReview ? "Recorded route privacy review" : privatePreview
+    ? "Private FIT preview" : metadata.dataset_id} · processing ${metadata.processing_version}`;
+  if (recordedReview) {
+    byId("provenance-origin").textContent = fullCyclingReview
+      ? "Running observations are masked; the selected cycling FIT is shown in full only in this private local review. Dates are withheld."
+      : "Only retained route sections and sensor observations are served. Full-activity totals and dates are withheld.";
+    byId("provenance-notes").textContent = (fullCyclingReview ? "Running: " : "") + "Distance sums visible GPS edges; retained time and ascent omit excluded intervals. Gaps stay disconnected. Fitness Profile and Training Planner use fictional history.";
+  } else if (privatePreview) {
+    byId("provenance-origin").textContent = "This local preview displays identifiable recorded GPS geometry. Exports are disabled.";
+    byId("provenance-notes").textContent = "GPS, distance, speed, heart rate, elevation and session ascent come from FIT. Pace and splits are calculated. Elapsed pace includes pauses. The time-weighted heart-rate mean excludes gaps and paused intervals.";
+  }
 }
 
 function setupExplorer(metadata) {
-  byId("json-export").hidden = false;
+  privatePreview = metadata.dataset_type === "private-fit-preview";
+  recordedReview = metadata.dataset_type === "recorded-visible-review";
+  fullCyclingReview = recordedReview && metadata.cycling_full_route === true;
+  byId("json-export").hidden = privatePreview || recordedReview;
+  byId("csv-export").hidden = privatePreview || recordedReview;
+  byId("fit-checks").hidden = !privatePreview;
+  if (recordedReview) {
+    byId("dataset-label").textContent = "Recorded route privacy review";
+    byId("route-subtitle").textContent = "Retained GPS sections · north-up";
+    byId("stat-distance-label").textContent = "Visible distance";
+    byId("stat-time-label").textContent = "Visible timer time";
+    byId("stat-gain-label").textContent = "Visible ascent";
+  } else if (privatePreview) {
+    byId("dataset-label").textContent = "Private local preview";
+    byId("route-subtitle").textContent = "Recorded GPS · north-up projection";
+    byId("stat-pace-label").textContent = "Elapsed pace";
+    byId("stat-gain-label").textContent = "Recorded ascent";
+  }
   plots = signals.map((signal, index) => createPlot(signal, index === signals.length - 1));
   for (const button of controls.metric.children) {
     button.addEventListener("click", () => {
       routeMetric = button.dataset.metric;
       for (const option of controls.metric.children) option.setAttribute("aria-pressed", String(button === option));
       renderRoute();
+      geographicView?.repaint();
     });
   }
   controls.route.addEventListener("click", (event) => {

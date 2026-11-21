@@ -2,6 +2,7 @@
 
 const comparisonRoot = byId("comparative-workspace");
 const runColors = ["var(--speed)", "var(--elevation)"];
+const lightRunColors = ["#78bafa", "#6fdbb1"];
 const km = (metres) => `${number(metres / 1000, 2)} km`;
 const covered = (value) => `${number(value * 100)}%`;
 const reading = (value, unit, precision = 1) => value == null ? "Unavailable" : `${number(value, precision)} ${unit}`;
@@ -70,25 +71,24 @@ function drawComparisonMap(graph, analysis, select) {
   const scale = Math.min(490 / Math.max(1, hiX - loX), 295 / Math.max(1, hiY - loY));
   const projectPoint = ([x, y]) => [300 + (x - (hiX + loX) / 2) * scale, 186 - (y - (hiY + loY) / 2) * scale];
   const xy = ([, x, y]) => projectPoint([x, y]).map((value) => value.toFixed(2)).join(",");
-  const drawPath = (d, color, width, dash = "none") => graph.append(svg("path", {
-    d, fill: "none", stroke: color, "stroke-width": width, "stroke-dasharray": dash,
-    "stroke-linecap": "round", "stroke-linejoin": "round",
+  const drawPath = (d, color, width) => graph.append(svg("path", {
+    d, fill: "none", stroke: color, "stroke-width": width, "stroke-linecap": "round", "stroke-linejoin": "round",
   }));
   const path = (part) => part.map((p, i) => `${i ? "L" : "M"}${xy(p)}`).join("");
   const grid = svg("pattern", { id: "comparison-grid", width: 28, height: 28, patternUnits: "userSpaceOnUse" });
-  grid.append(svg("path", { d: "M28 0H0V28", fill: "none", stroke: "var(--map-grid-minor)" }));
+  grid.append(svg("path", { d: "M28 0H0V28", fill: "none", stroke: "#29475c" }));
   graph.replaceChildren(svg("title", {}, "Routes and matched ground"),
     grid, svg("rect", { width: 600, height: 380, fill: "url(#comparison-grid)" }));
   graph.append(svg("text", { x: 565, y: 29, "text-anchor": "middle" }, "N"),
-    svg("path", { d: "M565 35l-6 16 6-4 6 4Z", fill: "var(--map-mark)" }));
+    svg("path", { d: "M565 35l-6 16 6-4 6 4Z", fill: "#c8ddec" }));
   const scaleM = gridStep(70 / scale);
-  graph.append(svg("path", { d: `M23 339v5h${scaleM * scale}v-5`, fill: "none", stroke: "var(--map-mark)" }),
+  graph.append(svg("path", { d: `M23 339v5h${scaleM * scale}v-5`, fill: "none", stroke: "#c8ddec" }),
     svg("text", { x: 23, y: 361 }, scaleM >= 1000 ? `${scaleM / 1000} km` : `${scaleM} m`));
   for (const [i, route] of analysis.routes.entries()) {
-    drawPath(route.map(path).join(""), runColors[i], 3, i === 0 ? "none" : "4 4");
+    drawPath(route.map(path).join(""), lightRunColors[i], 3);
   }
-  drawPath(path(analysis.shared), "var(--map-route-outline)", 8);
-  drawPath(path(analysis.shared), "var(--map-overlay)", 4);
+  drawPath(path(analysis.shared), "#102437", 8);
+  drawPath(path(analysis.shared), "#f2e1aa", 4);
   const marker = svg("g", { class: "comparison-marker" });
   graph.append(marker);
   const samples = analysis.bins.map((bin) => bin.values.map((value) => projectPoint(value.point)));
@@ -105,8 +105,8 @@ function drawComparisonMap(graph, analysis, select) {
     const points = samples[i];
     const overlap = Math.hypot(points[0][0] - points[1][0], points[0][1] - points[1][1]) < 8;
     marker.replaceChildren(...points.map(([cx, cy], j) => svg("circle", {
-      cx, cy, r: overlap ? (j === 0 ? 8 : 4) : 5.5, fill: runColors[j],
-      stroke: "var(--paper)", "stroke-width": overlap ? 1.2 : 2,
+      cx, cy, r: overlap ? (j === 0 ? 8 : 4) : 5.5, fill: lightRunColors[j],
+      stroke: "#102437", "stroke-width": overlap ? 1.2 : 2,
     })));
   };
 }
@@ -167,14 +167,14 @@ function comparisonChart(plot, bins, distance, indexAt, select, resizeTarget) {
       }
       drawBand();
     }
-    for (const { get, color, dash = "none" } of plot.series) {
+    for (const { get, color } of plot.series) {
       let path = "", wasValid = false;
       for (const bin of bins) {
         const value = get(bin);
         if (value != null) path += `${wasValid && !bin.break_before ? "L" : "M"}${xAt(bin.distance_m)},${yAt(value)}`;
         wasValid = value != null;
       }
-      graph.append(svg("path", { d: path, class: "comparison-line", stroke: color, "stroke-dasharray": dash }));
+      graph.append(svg("path", { d: path, class: "comparison-line", stroke: color }));
     }
     cursor = svg("line", { y1: top, y2: bottom, class: "cursor-line" });
     markers = plot.series.map(({ color }) => svg("circle", { r: 3.7, fill: color, stroke: "white" }));
@@ -216,10 +216,10 @@ function comparisonChart(plot, bins, distance, indexAt, select, resizeTarget) {
 function windDiagram(referenceWind) {
   const wrapper = html("div", "wind-diagram");
   const graph = svg("svg", { viewBox: "0 0 132 132", role: "img", "aria-label": "Travel and airflow directions" });
-  const rider = svg("path", { d: "M66 31l-5 11h3v35h4V42h3Z", fill: "var(--speed)" });
-  const air = svg("path", { d: "M66 25l-5 12h3v50h4V37h3Z", fill: "var(--elevation)" });
-  graph.append(svg("circle", { cx: 66, cy: 66, r: 46, fill: "var(--surface)", stroke: "var(--line)" }),
-    svg("path", { d: "M66 20v92M20 66h92", stroke: "var(--line)" }), rider, air);
+  const rider = svg("path", { d: "M66 31l-5 11h3v35h4V42h3Z", fill: "#237cc0" });
+  const air = svg("path", { d: "M66 25l-5 12h3v50h4V37h3Z", fill: "#087b67" });
+  graph.append(svg("circle", { cx: 66, cy: 66, r: 46, fill: "#f0f7fa", stroke: "#c8dbe6" }),
+    svg("path", { d: "M66 20v92M20 66h92", stroke: "#cfdee7" }), rider, air);
   for (const [label, x, y] of [["N", 66, 14], ["E", 120, 70], ["S", 66, 127], ["W", 11, 70]]) {
     graph.append(svg("text", { x, y, "text-anchor": "middle" }, label));
   }
@@ -250,7 +250,7 @@ function comparisonMethods(running, analysis) {
   const { methods, provenance, synthetic } = comparisonData;
   body.append(html("p", null, running
     ? `Geometry is tested every ${methods.match_step_m} m. A match needs ${methods.match_min_m} m of continuous forward progress, within ${methods.match_tolerance_m} m and ${methods.max_heading_difference_deg}° of direction. RMS separation here is ${reading(analysis.rms_separation_m, "m")}.`
-      : `Speed uses timed route distance in bins up to ${methods.ride_bin_m} m. Grade is elevation change over ${methods.grade_baseline_m} m of horizontal route. Headwind is positive, tailwind negative. The airflow arrow points in the direction the air moves.`));
+    : `Speed uses timed GPS distance in bins up to ${methods.ride_bin_m} m. Grade is elevation change over ${methods.grade_baseline_m} m of horizontal route. Headwind is positive, tailwind negative. The airflow arrow points in the direction the air moves.`));
   body.append(html("p", null, running
     ? "Pace uses common horizontal distance and timer-active seconds. Recording gaps split the route. Heart rate and device temperature are weighted by valid moving time."
     : synthetic ? "The elevation profile is generated. Weather and motion are fictional."
@@ -280,11 +280,12 @@ function showComparison(data, view, wholeRuns = []) {
   const titles = html("div");
   const names = running && analysis.available ? analysis.runs.map((run, i) =>
     wholeRuns[i]?.date ? `${run.name} · ${dayText(wholeRuns[i].date)}` : run.name) : [];
-  const headline = running ? "Matched section · fictional pair" : "Terrain, wind and cycling speed";
+  const headline = running ? (data.synthetic ? "Matched section · fictional pair" : "Matched section · recorded pair")
+    : recordedReview ? "Visible terrain and cycling speed" : "Terrain, wind and cycling speed";
   titles.append(html("h2", null, headline), html("p", null, running
       ? names.length ? `${names.join(" and ")} · aligned by distance over a continuous same-direction segment` : analysis.message
-      : analysis.available ? `${analysis.name} · ${km(analysis.distance_m)} of timed route geometry${analysis.recorded_ascent_m == null
-        ? "" : ` · ${reading(analysis.recorded_ascent_m, "m", 0)} ascent`}` : analysis.message));
+      : analysis.available ? `${analysis.name} · ${km(analysis.distance_m)} of timed GPS geometry${analysis.recorded_ascent_m == null
+        ? "" : ` · ${reading(analysis.recorded_ascent_m, "m", 0)} recorded ascent`}` : analysis.message));
   intro.append(titles);
   comparisonRoot.append(intro);
   if (!analysis.available) return;
@@ -297,7 +298,7 @@ function showComparison(data, view, wholeRuns = []) {
   const referenceWind = !running && !hasWind && bins.some((bin) => bin.reference_headwind_mps != null)
     ? analysis.activity_weather : null;
   const windKey = referenceWind ? "reference_headwind_mps" : "headwind_mps";
-  const charts = comparisonCard(running ? "Aligned performance" : "Along-route grade and wind",
+  const charts = comparisonCard(running ? "Aligned performance" : recordedReview ? "Visible grade and speed" : "Along-route grade and wind",
     running ? "Select a distance to move the matched-route markers." : "Select a distance to inspect the same position on the activity map and timeline.");
   const timeline = html("div", "timeline");
   const line = html("div", "timeline-label");
@@ -310,20 +311,21 @@ function showComparison(data, view, wholeRuns = []) {
   line.append(label, output);
   timeline.append(line, slider);
   const chartBody = html("div", "plots");
-  const paired = (key) => runColors.map((color, i) => ({
-    color, dash: i === 0 ? "none" : "4 3", get: (bin) => bin.values[i][key],
-  }));
-  const single = (key, color = "var(--speed)") => [{ color, get: (bin) => bin[key] }];
+  const paired = (key) => runColors.map((color, i) => ({ color, get: (bin) => bin.values[i][key] }));
+  const single = (key, color = "#1768a8") => [{ color, get: (bin) => bin[key] }];
   const series = running ? [
     { title: "Moving pace · min/km", series: paired("pace_s_per_km"), axis: clock, format: pace, minStep: 15 },
     { title: "Heart rate · bpm", series: paired("mean_heart_bpm"), format: (v) => reading(v, "bpm", 0), minStep: 2 },
     ...(hasWind ? [{ title: "Along-track wind · m/s", series: paired("headwind_mps"),
       format: headwind, zero: true, minStep: 1 }] : []),
   ] : [
-    { title: "Grade · %", series: [...single("recorded_grade_display_pct"), ...(hasTerrain ? single("terrain_grade_pct", "var(--elevation)") : [])],
+    { title: "Grade · %", series: [...single("recorded_grade_display_pct"), ...(hasTerrain ? single("terrain_grade_pct", "#087b67") : [])],
       format: (v) => v == null ? "Unavailable" : `${signed(v)}%`, zero: true, minStep: 1 },
-    { title: referenceWind ? "Along-track wind reference · m/s" : "Along-track wind · m/s",
-      series: single(windKey, "var(--elevation)"), format: headwind, zero: true, minStep: 1 },
+    recordedReview
+      ? { title: "GPS bin speed · km/h", series: single("speed_kmh", "#087b67"),
+        format: (v) => reading(v, "km/h"), minStep: 2 }
+      : { title: referenceWind ? "Along-track wind reference · m/s" : "Along-track wind · m/s",
+        series: single(windKey, "#087b67"), format: headwind, zero: true, minStep: 1 },
   ];
   const plots = series.map((plot) => comparisonChart(plot, bins, distance, indexAt, select, charts));
   chartBody.append(...plots.map(({ container }) => container));
@@ -332,12 +334,12 @@ function showComparison(data, view, wholeRuns = []) {
 
   let selection = analysis.strongest_climb ? indexAt(analysis.strongest_climb.distance_m) : Math.floor(bins.length * .38);
   let updateMap;
-  const vector = running ? null : windDiagram(referenceWind);
+  const vector = running || recordedReview ? null : windDiagram(referenceWind);
   function select(i, link = true) {
     selection = i;
     slider.value = i;
     const bin = bins[i];
-    output.value = running ? km(bin.distance_m) : `${km(bin.distance_m)} · ${clock(bin.elapsed_s)} elapsed`;
+    output.value = running ? km(bin.distance_m) : `${km(bin.distance_m)} · ${clock(bin.elapsed_s)} ${recordedReview ? "visible time" : "elapsed"}`;
     for (const plot of plots) plot.update(i);
     slider.setAttribute("aria-valuetext", [output.value, ...plots.map(({ container }) =>
       container.querySelector(".plot-header").innerText.trim())].join(", "));
@@ -354,8 +356,8 @@ function showComparison(data, view, wholeRuns = []) {
     mapFrame.append(map);
     mapCard.append(mapFrame, legend);
     updateMap = drawComparisonMap(map, analysis, select);
-    legend.append(html("span", "map-legend-a", `━ ${names[0]}`),
-      html("span", "map-legend-b", `┄ ${names[1]}`), html("span", "map-legend-shared", "━ Matched ground"));
+    legend.append(html("span", "map-legend-a", `● ${names[0]}`),
+      html("span", "map-legend-b", `● ${names[1]}`), html("span", "map-legend-shared", "━ Matched ground"));
     grid.append(mapCard);
   } else {
     rideTimelineUpdate = (elapsed) => {
@@ -393,8 +395,8 @@ function renderRunningEvidence(analysis, section, names, wholeRuns) {
   comparisonRoot.append(highlight);
   const heart = (bpm, coverage) => bpm == null ? "Unavailable"
     : `${reading(bpm, "bpm", 0)} · ${covered(coverage)} coverage`;
-  const scope = "Whole-run";
-  const summary = comparisonCard("Whole runs and matched section",
+  const scope = recordedReview ? "Visible" : "Whole-run";
+  const summary = comparisonCard(recordedReview ? "Visible routes and matched section" : "Whole runs and matched section",
     "Differences in recorded pace and heart rate describe these efforts. A fitness trend requires repeated evidence under comparable conditions.");
   summary.classList.add("run-comparison-summary");
   summary.append(comparisonTable(["Measurement", ...names], [
@@ -405,7 +407,8 @@ function renderRunningEvidence(analysis, section, names, wholeRuns) {
     ["Matched-section heart rate", ...analysis.runs.map((r) => heart(r.mean_heart_bpm, r.heart_coverage))],
   ]));
   summary.append(html("p", "comparison-copy",
-    "Heart-rate coverage uses elapsed time for the whole run and timer-active time for the matched section."));
+    recordedReview ? "Full-activity totals are withheld. Heart-rate coverage uses retained timer intervals."
+      : "Heart-rate coverage uses elapsed time for the whole run and timer-active time for the matched section."));
   comparisonRoot.append(summary);
   const panel = comparisonCard("Other segment measurements", "Coverage is shown beside means.");
   const runCells = (get) => analysis.runs.map(get);
@@ -416,6 +419,8 @@ function renderRunningEvidence(analysis, section, names, wholeRuns) {
   panel.append(comparisonTable(["Measurement", ...names], [
     ["Moving time", ...runCells((r) => clock(r.moving_s))],
     ["Elapsed time", ...runCells((r) => clock(r.elapsed_s))],
+    ...(!comparisonData.synthetic && !recordedReview ? [["Device temperature", ...runCells((r) => r.device_temperature_c == null ? "—"
+      : `${reading(r.device_temperature_c, "°C")} · ${covered(r.device_temperature_coverage)}`)]] : []),
     ...(hasSegmentWeather ? [
       field(comparisonData.synthetic ? "Fictional air temperature" : "Historical air temperature", "air_temperature_c", "°C"),
       field("Wind speed", "wind_speed_mps", "m/s"),
@@ -466,6 +471,7 @@ function renderCyclingEvidence(analysis, section, vector, hasTerrain, referenceW
     highlight.append(jump);
     comparisonRoot.append(highlight);
   }
+  if (recordedReview) return;
   const panel = comparisonCard(referenceWind ? "Wind reference at the selected distance" : "Wind at the selected distance",
     referenceWind ? "The archived speed and direction stay fixed as the rider’s heading changes."
       : "Along-track and crosswind depend on travel direction.");
@@ -486,3 +492,4 @@ function renderCyclingEvidence(analysis, section, vector, hasTerrain, referenceW
   if (hasTerrain) panel.append(html("p", "comparison-copy", "Blue profile · Recorded FIT. Teal profile · Terrain model."));
   section.append(panel);
 }
+

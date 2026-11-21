@@ -1,6 +1,6 @@
 # Fictional health and training methods
 
-Fitness Profile and Training Planner share the same 36-week fictional athlete history. The scenario control changes this history on both pages. The heavier scenario adds two completed sessions in the final week and shortens sleep over the final six mornings.
+Fitness Profile and Training Planner share the same 36-week fictional athlete history. The scenario control changes this history on both pages. The heavier scenario adds two completed sessions in the final week and shortens sleep over the final six mornings. Recorded private FIT activities do not enter this fixture.
 
 | Indicator | Inputs and method |
 | --- | --- |
@@ -14,4 +14,4 @@ For readiness, clamp each component to 0â€“100. The HRV component is `83 + 150 Ã
 
 The Planner's volume guard activates below 72 readiness or above 120% of the weekly load equivalent from the 28 days preceding the most recent seven days. It reduces the starting distance budgets by 20% and omits the controlled effort. The lighter option applies a further 25% reduction before rounding. Session distance and recent within-sport time per kilometre estimate planned duration. Assumed session RPE then supplies projected load. Changing a plan option affects proposed sessions and projected load. The morning observations and completed load belong to the selected scenario. [Semantic bands](semantic-methods.md)
 
-The three key takeaways use deterministic text templates. Each exposes the evidence behind its statements.
+The three key takeaways use deterministic text templates. Each exposes the evidence behind its statements. Profile and Planner health values are fictional in both preview modes. Explorer describes real activities only when the selected activity is a private FIT.
