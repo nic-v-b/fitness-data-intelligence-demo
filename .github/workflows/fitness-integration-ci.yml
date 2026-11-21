@@ -1,0 +1,63 @@
+name: Fitness integration checks
+
+on:
+  pull_request:
+
+concurrency:
+  group: fitness-integration-review
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install declared Leaflet dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run numerical, synthetic, and FIT privacy tests
+        run: python -m unittest discover -s tests -v
+      - name: Run geographic and UI regression tests
+        run: node --test tests/test_route_map.mjs tests/test_comparison_map.mjs tests/test_ui_contract.mjs
+      - name: Validate JavaScript syntax
+        run: |
+          for script in web/*.js; do node --check "$script"; done
+      - name: Validate synthetic export path
+        run: python app.py export --output artifacts/exports
+      - name: Check opt-in recorded runner keeps private file boundary
+        run: |
+          python tools/run_local_recorded_preview.py --help > /dev/null
+          if python tools/run_local_recorded_preview.py --run /tmp/not-private.fit > /tmp/runner-rejection.txt 2>&1; then
+            echo "Unexpectedly accepted a FIT path outside private-data/"
+            exit 1
+          fi
+          grep -q 'inside the ignored private-data directory' /tmp/runner-rejection.txt
+      - name: Synthetic desktop and mobile browser smoke test
+        run: |
+          python app.py serve --port 8130 > artifacts/fitness-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:8130/api/portfolio > /dev/null; then break; fi
+            sleep 1
+          done
+          BROWSER="$(command -v google-chrome || command -v chromium)"
+          test -n "$BROWSER"
+          node tools/capture_portfolio.mjs "$BROWSER"
+      - name: Save synthetic UI inspection screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitness-synthetic-ui
+          path: artifacts/portfolio-media/*.png
+          if-no-files-found: ignore
