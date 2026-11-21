@@ -4,12 +4,12 @@ I built Fitness Data Intelligence as an avid runner and cyclist with an engineer
 
 My aim is not to replace Garmin Connect or Strava, but to **extract more insight from the data they help record**. The approach combines wearable measurements with external environmental observations, identifies legitimately comparable runs through shared route geometry, and interprets individual efforts against personal trends accumulated over weeks, months, and years. The broader project also envisions an evidence-grounded large language model (LLM) that can synthesize quantitative findings and relevant exercise-science research into understandable explanations, acknowledge uncertainty, and help inform future training recommendations. The central questions are not only **what happened**, but **why performance might differ, where my fitness stands today, and what to do next**.
 
-**Portfolio scope.** Fitness Data Intelligence is an independently implemented engineering demonstration of selected ideas from my larger, privately developed *Spatial Fitness Intelligence* project. The public app uses deterministic fictional activities and a fictional 36-week athlete history. Its key takeaways and training suggestions come from explicit rules tied to their inputs, not a live LLM. Genuine Garmin measurements appear in this README as privacy-trimmed, flattened media.
+**Portfolio scope.** Fitness Data Intelligence is an independently implemented engineering demonstration of selected ideas from my larger, privately developed *Spatial Fitness Intelligence* project. The public app uses deterministic fictional activities and a fictional 36-week athlete history. Its key takeaways and training suggestions come from explicit rules tied to their inputs, not a live LLM. Genuine Garmin measurements are illustrated below through selected screenshots and a short animation; the underlying recordings are not distributed.
 
 
 ![Redesigned fictional Activity Explorer with a route map and synchronized speed, heart-rate, and elevation charts](docs/media/activity-explorer.png)
 
-*The interactive public demo uses independently generated fictional activities. The recorded-Garmin figures further below demonstrate the real-data pipeline using previously reviewed, flattened imagery; raw locations and FIT recordings are not distributed.*
+*The interactive public demo uses independently generated fictional activities. The Garmin examples further below demonstrate the same analytical methods on genuine recordings, without distributing raw activity data.*
 
 ## Explore the fictional demo
 
@@ -57,17 +57,17 @@ In the example below, **6 km Demo Run 08** and **6 km Demo Run 02** share **6.07
 
 ## Recorded Garmin examples
 
-Real recordings test the method against uneven sampling, GPS uncertainty, and genuine changes in speed and heart rate. The running examples below show only retained sections after the owner-selected 500 m endpoint mask; displayed running times and distances refer to the visible or matched ground. The complete cycling recording is available only in the optional private local review.
+Real Garmin recordings provide a complementary test of the methods against uneven sampling, GPS uncertainty, and genuine changes in speed and heart rate. The running examples focus on selected route sections rather than complete activities, so the reported distances, times, and comparisons refer only to the sections shown. The complete cycling activity can also be explored in the private local version.
 
 **Running on satellite imagery.** Recorded Run 01 retains 3.67 km. The selected sample locates a moment on the road and the same moment in all three timelines. The replay follows the observed signals through the run and then switches to distance along a matched section. [Recorded sensor replay](docs/media/recorded-sensor-replay.gif)
 
-![Recorded Run 01 on the privacy-trimmed satellite map with its speed, heart-rate, and elevation readings](docs/media/recorded-explorer-satellite.png)
+![Recorded running route over satellite imagery with synchronized speed, heart-rate, and elevation readings](docs/media/recorded-explorer-satellite.png)
 
 **3.53 km matched comparison · recorded runs.** Measured along Recorded Run 01, the two runs share 3.53 km. On that section, Run 01 averaged 6:09/km at 129 bpm and Run 03 averaged 5:17/km at 149 bpm. The pace difference persists across much of the section, as does the higher heart rate on the faster run. Establishing a fitness trend would require repeated evidence under comparable conditions.
 
 ![Genuine Garmin runs compared in 50 m bins across 3.53 km of shared ground](docs/media/recorded-running-comparison.png)
 
-**Cycling over changing terrain.** This previously captured graph aligns device elevation and GPS-derived speed across a 79.42 km retained section of a ride. The current opt-in local Garmin review additionally supports the owner-approved **complete 82.73 km cycling recording**, including its satellite route and recorded ascent; no raw cycling track is published. The climb and descent give speed changes a physical reference. Historical weather has not been verified for the published figure, so it cannot establish a wind effect.
+**Cycling over changing terrain.** This example aligns recorded elevation and GPS-derived speed over 79.42 km of a cycling activity. The private local application also supports the complete **82.73 km ride**, including its satellite route and recorded ascent. The climbs and descents provide useful physical context for interpreting speed changes, although the available evidence cannot establish a wind effect without verified historical weather.
 
 ![Recorded cycling elevation and GPS-derived speed plotted against retained distance](docs/media/recorded-cycling-profile.png)
 
@@ -77,7 +77,7 @@ Real recordings test the method against uneven sampling, GPS uncertainty, and ge
 - **Spatial alignment.** The matcher tests proximity, direction, and forward progress on continuous route sections. Matched pace uses each run’s timer-active time over a common reference distance. Close parallel roads or repeated passes can still be ambiguous. Short grades are sensitive to elevation noise, and projected wind cannot account for shelter, gusts, or rider effort. [Running and cycling methods](docs/comparative-methods.md)
 - **Athlete interpretation.** Training load uses session minutes multiplied by a session rating of perceived exertion. HRV, resting heart rate, sleep, and completed load feed a deterministic readiness score with illustrative weights. The score has no clinical validation. The suggested week illustrates a decision rule and carries no prediction of training response. [Health and planning methods](docs/health-methods.md) · [Evidence and classification rules](docs/semantic-methods.md)
 
-The interactive application and its JSON and CSV exports use independently generated fictional data. For recorded media, local preprocessing excludes **every visit within 500 m of any selected activity’s original start or finish**, checks connecting edges, and trims farther along the surviving sections. Removed sections stay disconnected. Original endpoints, dates, full-activity totals, raw FIT files, recorded coordinate arrays, and recorded API payloads remain private. The only public representations of the recordings are flattened images and animations. Familiar terrain and repeated approaches may still identify a location. Trimming cannot guarantee anonymity.
+The public interactive application and its JSON and CSV exports use independently generated fictional data. For the Garmin examples, I selected and processed specific running-route sections to avoid disclosing sensitive start and finish locations. The displayed observations and spatial comparisons are calculated only over those sections; excluded portions are not connected across gaps. Full recorded routes, precise activity dates, raw FIT files, GPS coordinate arrays, and private application data are not published. These screenshots and animations can still reveal recognizable geography and should not be regarded as anonymous.
 
 ## Run locally
 
